@@ -840,6 +840,58 @@ int System::addConstraintMidpointOnLine(Point& l1p1,
     return addConstraint(constr);
 }
 
+int System::addConstraintMirrorPoint(Point& pA, Point& pB, Line& axis, int tagId, bool driving)
+{
+    // Add two independent linear constraints: X and Y components
+    Constraint* constrX = new ConstraintMirrorPointX(pA, pB, axis);
+    constrX->setTag(tagId);
+    constrX->setDriving(driving);
+    addConstraint(constrX);
+    
+    Constraint* constrY = new ConstraintMirrorPointY(pA, pB, axis);
+    constrY->setTag(tagId);
+    constrY->setDriving(driving);
+    return addConstraint(constrY);
+}
+
+int System::addConstraintMirrorPoint(Point& pA,
+                                    Point& pB,
+                                    Point& axisP1,
+                                    Point& axisP2,
+                                    int tagId,
+                                    bool driving)
+{
+    // Add two independent linear constraints: X and Y components
+    Constraint* constrX = new ConstraintMirrorPointX(pA, pB, axisP1, axisP2);
+    constrX->setTag(tagId);
+    constrX->setDriving(driving);
+    addConstraint(constrX);
+    
+    Constraint* constrY = new ConstraintMirrorPointY(pA, pB, axisP1, axisP2);
+    constrY->setTag(tagId);
+    constrY->setDriving(driving);
+    return addConstraint(constrY);
+}
+
+int System::addConstraintCircularInstance(Point& p0,
+                                          Point& pk,
+                                          Point& center,
+                                          double* angle,
+                                          int tagId,
+                                          bool driving)
+{
+    // Add two independent constraints: X and Y components
+    Constraint* constrX = new ConstraintCircularInstanceX(p0, pk, center, angle);
+    constrX->setTag(tagId);
+    constrX->setDriving(driving);
+    addConstraint(constrX);
+    
+    Constraint* constrY = new ConstraintCircularInstanceY(p0, pk, center, angle);
+    constrY->setTag(tagId);
+    constrY->setDriving(driving);
+    return addConstraint(constrY);
+}
+
 int System::addConstraintTangentCircumf(Point& p1,
                                         Point& p2,
                                         double* rad1,

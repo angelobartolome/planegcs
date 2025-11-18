@@ -345,6 +345,19 @@ public:
                                     Point& l2p2,
                                     int tagId = 0,
                                     bool driving = true);
+    int addConstraintMirrorPoint(Point& pA, Point& pB, Line& axis, int tagId = 0, bool driving = true);
+    int addConstraintMirrorPoint(Point& pA,
+                                 Point& pB,
+                                 Point& axisP1,
+                                 Point& axisP2,
+                                 int tagId = 0,
+                                 bool driving = true);
+    int addConstraintCircularInstance(Point& p0,
+                                      Point& pk,
+                                      Point& center,
+                                      double* angle,
+                                      int tagId = 0,
+                                      bool driving = true);
     int addConstraintTangentCircumf(Point& p1,
                                     Point& p2,
                                     double* rd1,
@@ -462,7 +475,7 @@ public:
                                  int tagId = 0,
                                  bool driving = true);
     int addConstraintArcLength(Arc& a, double* dist, int tagId, bool driving = true);
-
+    
     // internal alignment constraints
     int addConstraintInternalAlignmentPoint2Ellipse(Ellipse& e,
                                                     Point& p1,

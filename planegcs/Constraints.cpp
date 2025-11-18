@@ -3582,4 +3582,704 @@ double ConstraintArcLength::grad(double* param)
 }
 
 
+// --------------------------------------------------------
+// MirrorPoint
+ConstraintMirrorPoint::ConstraintMirrorPoint(Point& pA, Point& pB, Line& axis)
+{
+    pvec.push_back(pA.x);
+    pvec.push_back(pA.y);
+    pvec.push_back(pB.x);
+    pvec.push_back(pB.y);
+    pvec.push_back(axis.p1.x);
+    pvec.push_back(axis.p1.y);
+    pvec.push_back(axis.p2.x);
+    pvec.push_back(axis.p2.y);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintMirrorPoint::ConstraintMirrorPoint(Point& pA, Point& pB, Point& axisP1, Point& axisP2)
+{
+    pvec.push_back(pA.x);
+    pvec.push_back(pA.y);
+    pvec.push_back(pB.x);
+    pvec.push_back(pB.y);
+    pvec.push_back(axisP1.x);
+    pvec.push_back(axisP1.y);
+    pvec.push_back(axisP2.x);
+    pvec.push_back(axisP2.y);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintType ConstraintMirrorPoint::getTypeId()
+{
+    return MirrorPoint;
+}
+
+void ConstraintMirrorPoint::rescale(double coef)
+{
+    scale = coef * 1;
+}
+
+double ConstraintMirrorPoint::error()
+{
+    double ax = *pAx(), ay = *pAy();
+    double bx = *pBx(), by = *pBy();
+    double x1 = *axisP1x(), y1 = *axisP1y();
+    double x2 = *axisP2x(), y2 = *axisP2y();
+    
+    // Calculate line direction vector
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double d = sqrt(dx * dx + dy * dy);
+    
+    if (d < 1e-10) {
+        // Line is degenerate (zero length), return large error
+        return scale * 1e10;
+    }
+    
+    // Calculate normalized normal vector (perpendicular to line, pointing left)
+    // Rotate direction vector 90 degrees CCW: (-dy, dx)
+    double nx = -dy / d;
+    double ny = dx / d;
+    
+    // Calculate distance from point A to line
+    // Vector from axisP1 to A
+    double vx = ax - x1;
+    double vy = ay - y1;
+    // Distance = dot product with normal
+    double dist = vx * nx + vy * ny;
+    
+    // Calculate mirrored position of A
+    // A_mirrored = A - 2 * dist * normal
+    double ax_mirrored = ax - 2 * dist * nx;
+    double ay_mirrored = ay - 2 * dist * ny;
+    
+    // Error is the distance between B and mirrored A
+    double errx = bx - ax_mirrored;
+    double erry = by - ay_mirrored;
+    double error = sqrt(errx * errx + erry * erry);
+    
+    return scale * error;
+}
+
+double ConstraintMirrorPoint::grad(double* param)
+{
+    double deriv = 0.;
+    if (param == axisP1x() || param == axisP1y() ||
+            param == axisP2x() || param == axisP2y()) {
+            return 0.0;
+    }
+
+
+    if (param == pAx() || param == pAy() || param == pBx() || param == pBy()
+        || param == axisP1x() || param == axisP1y() || param == axisP2x() || param == axisP2y()) {
+        
+        double ax = *pAx(), ay = *pAy();
+        double bx = *pBx(), by = *pBy();
+        double x1 = *axisP1x(), y1 = *axisP1y();
+        double x2 = *axisP2x(), y2 = *axisP2y();
+        
+        // Calculate line direction vector
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double d2 = dx * dx + dy * dy;
+        double d = sqrt(d2);
+        
+        if (d < 1e-10) {
+            return 0.;
+        }
+        
+        // Normalized normal vector
+        double nx = -dy / d;
+        double ny = dx / d;
+        
+        // Distance from A to line
+        double vx = ax - x1;
+        double vy = ay - y1;
+        double dist = vx * nx + vy * ny;
+        
+        // Mirrored position
+        double ax_mirrored = ax - 2 * dist * nx;
+        double ay_mirrored = ay - 2 * dist * ny;
+        
+        // Error components
+        double errx = bx - ax_mirrored;
+        double erry = by - ay_mirrored;
+        double error_mag = sqrt(errx * errx + erry * erry);
+        
+        if (error_mag < 1e-10) {
+            return 0.;
+        }
+        
+        // Derivatives of normalized normal vector components
+        // nx = -dy/d, ny = dx/d, where d = sqrt(dx^2 + dy^2)
+        // dnx/dx1 = dy*dx/(d^3), dnx/dy1 = -dy^2/(d^3) - 1/d
+        // dnx/dx2 = -dy*dx/(d^3), dnx/dy2 = dy^2/(d^3) + 1/d
+        // dny/dx1 = dx^2/(d^3) + 1/d, dny/dy1 = -dx*dy/(d^3)
+        // dny/dx2 = -dx^2/(d^3) - 1/d, dny/dy2 = dx*dy/(d^3)
+        double d3 = d * d2;
+        double dnx_dx1 = dy * dx / d3;
+        double dnx_dy1 = -dy * dy / d3 - 1.0 / d;
+        double dnx_dx2 = -dy * dx / d3;
+        double dnx_dy2 = dy * dy / d3 + 1.0 / d;
+        
+        double dny_dx1 = dx * dx / d3 + 1.0 / d;
+        double dny_dy1 = -dx * dy / d3;
+        double dny_dx2 = -dx * dx / d3 - 1.0 / d;
+        double dny_dy2 = dx * dy / d3;
+        
+        // Derivatives of distance
+        double ddist_dax = nx;
+        double ddist_day = ny;
+        double ddist_dx1 = -nx + vx * dnx_dx1 + vy * dny_dx1;
+        double ddist_dy1 = -ny + vx * dnx_dy1 + vy * dny_dy1;
+        double ddist_dx2 = vx * dnx_dx2 + vy * dny_dx2;
+        double ddist_dy2 = vx * dnx_dy2 + vy * dny_dy2;
+        
+        // Derivatives of mirrored position
+        double dax_mirrored_dax = 1 - 2 * ddist_dax * nx;
+        double dax_mirrored_day = -2 * ddist_day * nx;
+        double dax_mirrored_dx1 = -2 * ddist_dx1 * nx - 2 * dist * dnx_dx1;
+        double dax_mirrored_dy1 = -2 * ddist_dy1 * nx - 2 * dist * dnx_dy1;
+        double dax_mirrored_dx2 = -2 * ddist_dx2 * nx - 2 * dist * dnx_dx2;
+        double dax_mirrored_dy2 = -2 * ddist_dy2 * nx - 2 * dist * dnx_dy2;
+        
+        double day_mirrored_dax = -2 * ddist_dax * ny;
+        double day_mirrored_day = 1 - 2 * ddist_day * ny;
+        double day_mirrored_dx1 = -2 * ddist_dx1 * ny - 2 * dist * dny_dx1;
+        double day_mirrored_dy1 = -2 * ddist_dy1 * ny - 2 * dist * dny_dy1;
+        double day_mirrored_dx2 = -2 * ddist_dx2 * ny - 2 * dist * dny_dx2;
+        double day_mirrored_dy2 = -2 * ddist_dy2 * ny - 2 * dist * dny_dy2;
+        
+        // Derivative of error with respect to parameter
+        if (param == pAx()) {
+            deriv = -(errx * dax_mirrored_dax + erry * day_mirrored_dax) / error_mag;
+        } else if (param == pAy()) {
+            deriv = -(errx * dax_mirrored_day + erry * day_mirrored_day) / error_mag;
+        } else if (param == pBx()) {
+            deriv = errx / error_mag;
+        } else if (param == pBy()) {
+            deriv = erry / error_mag;
+        } else if (param == axisP1x()) {
+            deriv = -(errx * dax_mirrored_dx1 + erry * day_mirrored_dx1) / error_mag;
+        } else if (param == axisP1y()) {
+            deriv = -(errx * dax_mirrored_dy1 + erry * day_mirrored_dy1) / error_mag;
+        } else if (param == axisP2x()) {
+            deriv = -(errx * dax_mirrored_dx2 + erry * day_mirrored_dx2) / error_mag;
+        } else if (param == axisP2y()) {
+            deriv = -(errx * dax_mirrored_dy2 + erry * day_mirrored_dy2) / error_mag;
+        }
+    }
+    return scale * deriv;
+}
+
+// --------------------------------------------------------
+// MirrorPointX - Constraint 1: f1 = bx - ax_mirrored = 0
+ConstraintMirrorPointX::ConstraintMirrorPointX(Point& pA, Point& pB, Line& axis)
+{
+    pvec.push_back(pA.x);
+    pvec.push_back(pA.y);
+    pvec.push_back(pB.x);
+    pvec.push_back(pB.y);
+    pvec.push_back(axis.p1.x);
+    pvec.push_back(axis.p1.y);
+    pvec.push_back(axis.p2.x);
+    pvec.push_back(axis.p2.y);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintMirrorPointX::ConstraintMirrorPointX(Point& pA, Point& pB, Point& axisP1, Point& axisP2)
+{
+    pvec.push_back(pA.x);
+    pvec.push_back(pA.y);
+    pvec.push_back(pB.x);
+    pvec.push_back(pB.y);
+    pvec.push_back(axisP1.x);
+    pvec.push_back(axisP1.y);
+    pvec.push_back(axisP2.x);
+    pvec.push_back(axisP2.y);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintType ConstraintMirrorPointX::getTypeId()
+{
+    return MirrorPointX;
+}
+
+void ConstraintMirrorPointX::rescale(double coef)
+{
+    scale = coef * 1;
+}
+
+double ConstraintMirrorPointX::error()
+{
+    double ax = *pAx(), ay = *pAy();
+    double bx = *pBx();
+    double x1 = *axisP1x(), y1 = *axisP1y();
+    double x2 = *axisP2x(), y2 = *axisP2y();
+    
+    // Calculate line direction vector
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double d2 = dx * dx + dy * dy;
+    
+    if (d2 < 1e-20) {
+        // Line is degenerate (zero length), return large error
+        return scale * 1e10;
+    }
+    
+    double d = sqrt(d2);
+    
+    // Calculate normalized normal vector (perpendicular to line, pointing left)
+    // Rotate direction vector 90 degrees CCW: (-dy, dx)
+    double nx = -dy / d;
+    double ny = dx / d;
+    
+    // Calculate distance from point A to line
+    // Vector from axisP1 to A
+    double vx = ax - x1;
+    double vy = ay - y1;
+    // Distance = dot product with normal
+    double dist = vx * nx + vy * ny;
+    
+    // Calculate mirrored position of A
+    // A_mirrored = A - 2 * dist * normal
+    double ax_mirrored = ax - 2 * dist * nx;
+    
+    // Error is the linear difference: f1 = bx - ax_mirrored
+    double err = bx - ax_mirrored;
+    
+    return scale * err;
+}
+
+double ConstraintMirrorPointX::grad(double* param)
+{
+    double deriv = 0.;
+
+    if (param == axisP1x() || param == axisP1y() || param == axisP2x() || param == axisP2y()) {
+        return 0.0;
+    }
+
+
+    if (param == pAx() || param == pAy() || param == pBx() || param == pBy()
+        || param == axisP1x() || param == axisP1y() || param == axisP2x() || param == axisP2y()) {
+        
+        double ax = *pAx(), ay = *pAy();
+        double bx = *pBx();
+        double x1 = *axisP1x(), y1 = *axisP1y();
+        double x2 = *axisP2x(), y2 = *axisP2y();
+        
+        // Calculate line direction vector
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double d2 = dx * dx + dy * dy;
+        
+        if (d2 < 1e-20) {
+            return 0.;
+        }
+        
+        double d = sqrt(d2);
+        double d3 = d * d2;
+        
+        // Normalized normal vector
+        double nx = -dy / d;
+        double ny = dx / d;
+        
+        // Distance from A to line
+        double vx = ax - x1;
+        double vy = ay - y1;
+        double dist = vx * nx + vy * ny;
+        
+        // Derivatives of normalized normal vector components
+        double dnx_dx1 = dy * dx / d3;
+        double dnx_dy1 = -dy * dy / d3 - 1.0 / d;
+        double dnx_dx2 = -dy * dx / d3;
+        double dnx_dy2 = dy * dy / d3 + 1.0 / d;
+        
+        double dny_dx1 = dx * dx / d3 + 1.0 / d;
+        double dny_dy1 = -dx * dy / d3;
+        double dny_dx2 = -dx * dx / d3 - 1.0 / d;
+        double dny_dy2 = dx * dy / d3;
+        
+        // Derivatives of distance
+        double ddist_dax = nx;
+        double ddist_day = ny;
+        double ddist_dx1 = -nx + vx * dnx_dx1 + vy * dny_dx1;
+        double ddist_dy1 = -ny + vx * dnx_dy1 + vy * dny_dy1;
+        double ddist_dx2 = vx * dnx_dx2 + vy * dny_dx2;
+        double ddist_dy2 = vx * dnx_dy2 + vy * dny_dy2;
+        
+        // Derivative of ax_mirrored
+        double dax_mirrored_dax = 1 - 2 * ddist_dax * nx;
+        double dax_mirrored_day = -2 * ddist_day * nx;
+        double dax_mirrored_dx1 = -2 * ddist_dx1 * nx - 2 * dist * dnx_dx1;
+        double dax_mirrored_dy1 = -2 * ddist_dy1 * nx - 2 * dist * dnx_dy1;
+        double dax_mirrored_dx2 = -2 * ddist_dx2 * nx - 2 * dist * dnx_dx2;
+        double dax_mirrored_dy2 = -2 * ddist_dy2 * nx - 2 * dist * dnx_dy2;
+        
+        // Derivative of error f1 = bx - ax_mirrored with respect to parameter
+        if (param == pAx()) {
+            deriv = -dax_mirrored_dax;
+        } else if (param == pAy()) {
+            deriv = -dax_mirrored_day;
+        } else if (param == pBx()) {
+            deriv = 1.0;  // d(bx - ax_mirrored)/dbx = 1
+        } else if (param == pBy()) {
+            deriv = 0.0;  // d(bx - ax_mirrored)/dby = 0
+        } else if (param == axisP1x()) {
+            deriv = -dax_mirrored_dx1;
+        } else if (param == axisP1y()) {
+            deriv = -dax_mirrored_dy1;
+        } else if (param == axisP2x()) {
+            deriv = -dax_mirrored_dx2;
+        } else if (param == axisP2y()) {
+            deriv = -dax_mirrored_dy2;
+        }
+    }
+    return scale * deriv;
+}
+
+// --------------------------------------------------------
+// MirrorPointY - Constraint 2: f2 = by - ay_mirrored = 0
+ConstraintMirrorPointY::ConstraintMirrorPointY(Point& pA, Point& pB, Line& axis)
+{
+    pvec.push_back(pA.x);
+    pvec.push_back(pA.y);
+    pvec.push_back(pB.x);
+    pvec.push_back(pB.y);
+    pvec.push_back(axis.p1.x);
+    pvec.push_back(axis.p1.y);
+    pvec.push_back(axis.p2.x);
+    pvec.push_back(axis.p2.y);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintMirrorPointY::ConstraintMirrorPointY(Point& pA, Point& pB, Point& axisP1, Point& axisP2)
+{
+    pvec.push_back(pA.x);
+    pvec.push_back(pA.y);
+    pvec.push_back(pB.x);
+    pvec.push_back(pB.y);
+    pvec.push_back(axisP1.x);
+    pvec.push_back(axisP1.y);
+    pvec.push_back(axisP2.x);
+    pvec.push_back(axisP2.y);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintType ConstraintMirrorPointY::getTypeId()
+{
+    return MirrorPointY;
+}
+
+void ConstraintMirrorPointY::rescale(double coef)
+{
+    scale = coef * 1;
+}
+
+double ConstraintMirrorPointY::error()
+{
+    double ax = *pAx(), ay = *pAy();
+    double by = *pBy();
+    double x1 = *axisP1x(), y1 = *axisP1y();
+    double x2 = *axisP2x(), y2 = *axisP2y();
+    
+    // Calculate line direction vector
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double d2 = dx * dx + dy * dy;
+    
+    if (d2 < 1e-20) {
+        // Line is degenerate (zero length), return large error
+        return scale * 1e10;
+    }
+    
+    double d = sqrt(d2);
+    
+    // Calculate normalized normal vector (perpendicular to line, pointing left)
+    // Rotate direction vector 90 degrees CCW: (-dy, dx)
+    double nx = -dy / d;
+    double ny = dx / d;
+    
+    // Calculate distance from point A to line
+    // Vector from axisP1 to A
+    double vx = ax - x1;
+    double vy = ay - y1;
+    // Distance = dot product with normal
+    double dist = vx * nx + vy * ny;
+    
+    // Calculate mirrored position of A
+    // A_mirrored = A - 2 * dist * normal
+    double ay_mirrored = ay - 2 * dist * ny;
+    
+    // Error is the linear difference: f2 = by - ay_mirrored
+    double err = by - ay_mirrored;
+    
+    return scale * err;
+}
+
+double ConstraintMirrorPointY::grad(double* param)
+{
+    double deriv = 0.;
+
+    if (param == axisP1x() || param == axisP1y() || param == axisP2x() || param == axisP2y()) {
+        return 0.0;
+    }
+
+    if (param == pAx() || param == pAy() || param == pBx() || param == pBy()
+        || param == axisP1x() || param == axisP1y() || param == axisP2x() || param == axisP2y()) {
+        
+        double ax = *pAx(), ay = *pAy();
+        double by = *pBy();
+        double x1 = *axisP1x(), y1 = *axisP1y();
+        double x2 = *axisP2x(), y2 = *axisP2y();
+        
+        // Calculate line direction vector
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double d2 = dx * dx + dy * dy;
+        
+        if (d2 < 1e-20) {
+            return 0.;
+        }
+        
+        double d = sqrt(d2);
+        double d3 = d * d2;
+        
+        // Normalized normal vector
+        double nx = -dy / d;
+        double ny = dx / d;
+        
+        // Distance from A to line
+        double vx = ax - x1;
+        double vy = ay - y1;
+        double dist = vx * nx + vy * ny;
+        
+        // Derivatives of normalized normal vector components
+        double dnx_dx1 = dy * dx / d3;
+        double dnx_dy1 = -dy * dy / d3 - 1.0 / d;
+        double dnx_dx2 = -dy * dx / d3;
+        double dnx_dy2 = dy * dy / d3 + 1.0 / d;
+        
+        double dny_dx1 = dx * dx / d3 + 1.0 / d;
+        double dny_dy1 = -dx * dy / d3;
+        double dny_dx2 = -dx * dx / d3 - 1.0 / d;
+        double dny_dy2 = dx * dy / d3;
+        
+        // Derivatives of distance
+        double ddist_dax = nx;
+        double ddist_day = ny;
+        double ddist_dx1 = -nx + vx * dnx_dx1 + vy * dny_dx1;
+        double ddist_dy1 = -ny + vx * dnx_dy1 + vy * dny_dy1;
+        double ddist_dx2 = vx * dnx_dx2 + vy * dny_dx2;
+        double ddist_dy2 = vx * dnx_dy2 + vy * dny_dy2;
+        
+        // Derivative of ay_mirrored
+        double day_mirrored_dax = -2 * ddist_dax * ny;
+        double day_mirrored_day = 1 - 2 * ddist_day * ny;
+        double day_mirrored_dx1 = -2 * ddist_dx1 * ny - 2 * dist * dny_dx1;
+        double day_mirrored_dy1 = -2 * ddist_dy1 * ny - 2 * dist * dny_dy1;
+        double day_mirrored_dx2 = -2 * ddist_dx2 * ny - 2 * dist * dny_dx2;
+        double day_mirrored_dy2 = -2 * ddist_dy2 * ny - 2 * dist * dny_dy2;
+        
+        // Derivative of error f2 = by - ay_mirrored with respect to parameter
+        if (param == pAx()) {
+            deriv = -day_mirrored_dax;
+        } else if (param == pAy()) {
+            deriv = -day_mirrored_day;
+        } else if (param == pBx()) {
+            deriv = 0.0;  // d(by - ay_mirrored)/dbx = 0
+        } else if (param == pBy()) {
+            deriv = 1.0;  // d(by - ay_mirrored)/dby = 1
+        } else if (param == axisP1x()) {
+            deriv = -day_mirrored_dx1;
+        } else if (param == axisP1y()) {
+            deriv = -day_mirrored_dy1;
+        } else if (param == axisP2x()) {
+            deriv = -day_mirrored_dx2;
+        } else if (param == axisP2y()) {
+            deriv = -day_mirrored_dy2;
+        }
+    }
+    return scale * deriv;
+}
+
+// --------------------------------------------------------
+// CircularInstanceX - Constraint 1: f1 = pk_x - [cx + cos(θ) * (p0_x - cx) - sin(θ) * (p0_y - cy)] = 0
+ConstraintCircularInstanceX::ConstraintCircularInstanceX(Point& p0, Point& pk, Point& center, double* angle)
+{
+    pvec.push_back(p0.x);
+    pvec.push_back(p0.y);
+    pvec.push_back(pk.x);
+    pvec.push_back(pk.y);
+    pvec.push_back(center.x);
+    pvec.push_back(center.y);
+    pvec.push_back(angle);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintType ConstraintCircularInstanceX::getTypeId()
+{
+    return CircularInstanceX;
+}
+
+void ConstraintCircularInstanceX::rescale(double coef)
+{
+    scale = coef * 1.;
+}
+
+double ConstraintCircularInstanceX::error()
+{
+    double p0_x = *p0x(), p0_y = *p0y();
+    double pk_x = *pkx();
+    double c_x = *cx(), c_y = *cy();
+    double theta = *angle();
+    
+    double cos_theta = cos(theta);
+    double sin_theta = sin(theta);
+    
+    // Compute rotated point: pk_expected = C + R(θ) * (P0 - C)
+    // X component: pk_x = cx + cos(θ) * (p0_x - cx) - sin(θ) * (p0_y - cy)
+    double pk_x_expected = c_x + cos_theta * (p0_x - c_x) - sin_theta * (p0_y - c_y);
+    
+    // Error: difference between actual and expected
+    double err = pk_x - pk_x_expected;
+    
+    return scale * err;
+}
+
+double ConstraintCircularInstanceX::grad(double* param)
+{
+    double deriv = 0.;
+    if (param == p0x() || param == p0y() || param == pkx() || param == pky()
+        || param == cx() || param == cy() || param == angle()) {
+        
+        double p0_x = *p0x(), p0_y = *p0y();
+        double c_x = *cx(), c_y = *cy();
+        double theta = *angle();
+        
+        double cos_theta = cos(theta);
+        double sin_theta = sin(theta);
+        
+        // Error: err = pk_x - [cx + cos(θ) * (p0_x - cx) - sin(θ) * (p0_y - cy)]
+        // Derivatives:
+        if (param == p0x()) {
+            // d/dp0_x: -cos(θ)
+            deriv = -cos_theta;
+        } else if (param == p0y()) {
+            // d/dp0_y: sin(θ)
+            deriv = sin_theta;
+        } else if (param == pkx()) {
+            // d/dpk_x: 1
+            deriv = 1.0;
+        } else if (param == pky()) {
+            // d/dpk_y: 0
+            deriv = 0.0;
+        } else if (param == cx()) {
+            // d/dcx: 1 - cos(θ)
+            deriv = 1.0 - cos_theta;
+        } else if (param == cy()) {
+            // d/dcy: sin(θ)
+            deriv = sin_theta;
+        } else if (param == angle()) {
+            // d/dθ: -sin(θ) * (p0_x - cx) - cos(θ) * (p0_y - cy)
+            deriv = -sin_theta * (p0_x - c_x) - cos_theta * (p0_y - c_y);
+        }
+    }
+    return scale * deriv;
+}
+
+// --------------------------------------------------------
+// CircularInstanceY - Constraint 2: f2 = pk_y - [cy + sin(θ) * (p0_x - cx) + cos(θ) * (p0_y - cy)] = 0
+ConstraintCircularInstanceY::ConstraintCircularInstanceY(Point& p0, Point& pk, Point& center, double* angle)
+{
+    pvec.push_back(p0.x);
+    pvec.push_back(p0.y);
+    pvec.push_back(pk.x);
+    pvec.push_back(pk.y);
+    pvec.push_back(center.x);
+    pvec.push_back(center.y);
+    pvec.push_back(angle);
+    origpvec = pvec;
+    rescale();
+}
+
+ConstraintType ConstraintCircularInstanceY::getTypeId()
+{
+    return CircularInstanceY;
+}
+
+void ConstraintCircularInstanceY::rescale(double coef)
+{
+    scale = coef * 1.;
+}
+
+double ConstraintCircularInstanceY::error()
+{
+    double p0_x = *p0x(), p0_y = *p0y();
+    double pk_y = *pky();
+    double c_x = *cx(), c_y = *cy();
+    double theta = *angle();
+    
+    double cos_theta = cos(theta);
+    double sin_theta = sin(theta);
+    
+    // Compute rotated point: pk_expected = C + R(θ) * (P0 - C)
+    // Y component: pk_y = cy + sin(θ) * (p0_x - cx) + cos(θ) * (p0_y - cy)
+    double pk_y_expected = c_y + sin_theta * (p0_x - c_x) + cos_theta * (p0_y - c_y);
+    
+    // Error: difference between actual and expected
+    double err = pk_y - pk_y_expected;
+    
+    return scale * err;
+}
+
+double ConstraintCircularInstanceY::grad(double* param)
+{
+    double deriv = 0.;
+    if (param == p0x() || param == p0y() || param == pkx() || param == pky()
+        || param == cx() || param == cy() || param == angle()) {
+        
+        double p0_x = *p0x(), p0_y = *p0y();
+        double c_x = *cx(), c_y = *cy();
+        double theta = *angle();
+        
+        double cos_theta = cos(theta);
+        double sin_theta = sin(theta);
+        
+        // Error: err = pk_y - [cy + sin(θ) * (p0_x - cx) + cos(θ) * (p0_y - cy)]
+        // Derivatives:
+        if (param == p0x()) {
+            // d/dp0_x: -sin(θ)
+            deriv = -sin_theta;
+        } else if (param == p0y()) {
+            // d/dp0_y: -cos(θ)
+            deriv = -cos_theta;
+        } else if (param == pkx()) {
+            // d/dpk_x: 0
+            deriv = 0.0;
+        } else if (param == pky()) {
+            // d/dpk_y: 1
+            deriv = 1.0;
+        } else if (param == cx()) {
+            // d/dcx: -sin(θ)
+            deriv = -sin_theta;
+        } else if (param == cy()) {
+            // d/dcy: 1 - cos(θ)
+            deriv = 1.0 - cos_theta;
+        } else if (param == angle()) {
+            // d/dθ: cos(θ) * (p0_x - cx) - sin(θ) * (p0_y - cy)
+            deriv = cos_theta * (p0_x - c_x) - sin_theta * (p0_y - c_y);
+        }
+    }
+    return scale * deriv;
+}
+
 }  // namespace GCS

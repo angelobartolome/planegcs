@@ -82,6 +82,12 @@ enum ConstraintType
     AngleViaPointAndTwoParams = 34,
     AngleViaTwoPoints = 35,
     ArcLength = 36,
+    MirrorPoint = 37,
+    MirrorPointX = 38,
+    MirrorPointY = 39,
+    CircularInstance = 40,
+    CircularInstanceX = 41,
+    CircularInstanceY = 42,
 };
 
 enum InternalAlignmentType
@@ -1402,6 +1408,246 @@ private:
               double* param);  // error and gradient combined. Values are returned through pointers.
 public:
     ConstraintArcLength(Arc& a, double* d);
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// MirrorPoint
+class ConstraintMirrorPoint: public Constraint
+{
+private:
+    inline double* pAx()
+    {
+        return pvec[0];
+    }
+    inline double* pAy()
+    {
+        return pvec[1];
+    }
+    inline double* pBx()
+    {
+        return pvec[2];
+    }
+    inline double* pBy()
+    {
+        return pvec[3];
+    }
+    inline double* axisP1x()
+    {
+        return pvec[4];
+    }
+    inline double* axisP1y()
+    {
+        return pvec[5];
+    }
+    inline double* axisP2x()
+    {
+        return pvec[6];
+    }
+    inline double* axisP2y()
+    {
+        return pvec[7];
+    }
+
+public:
+    ConstraintMirrorPoint(Point& pA, Point& pB, Line& axis);
+    ConstraintMirrorPoint(Point& pA, Point& pB, Point& axisP1, Point& axisP2);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintMirrorPoint()
+    {}
+#endif
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// MirrorPointX - Constraint 1: f1 = bx - ax_mirrored = 0
+class ConstraintMirrorPointX: public Constraint
+{
+private:
+    inline double* pAx()
+    {
+        return pvec[0];
+    }
+    inline double* pAy()
+    {
+        return pvec[1];
+    }
+    inline double* pBx()
+    {
+        return pvec[2];
+    }
+    inline double* pBy()
+    {
+        return pvec[3];
+    }
+    inline double* axisP1x()
+    {
+        return pvec[4];
+    }
+    inline double* axisP1y()
+    {
+        return pvec[5];
+    }
+    inline double* axisP2x()
+    {
+        return pvec[6];
+    }
+    inline double* axisP2y()
+    {
+        return pvec[7];
+    }
+
+public:
+    ConstraintMirrorPointX(Point& pA, Point& pB, Line& axis);
+    ConstraintMirrorPointX(Point& pA, Point& pB, Point& axisP1, Point& axisP2);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintMirrorPointX()
+    {}
+#endif
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// MirrorPointY - Constraint 2: f2 = by - ay_mirrored = 0
+class ConstraintMirrorPointY: public Constraint
+{
+private:
+    inline double* pAx()
+    {
+        return pvec[0];
+    }
+    inline double* pAy()
+    {
+        return pvec[1];
+    }
+    inline double* pBx()
+    {
+        return pvec[2];
+    }
+    inline double* pBy()
+    {
+        return pvec[3];
+    }
+    inline double* axisP1x()
+    {
+        return pvec[4];
+    }
+    inline double* axisP1y()
+    {
+        return pvec[5];
+    }
+    inline double* axisP2x()
+    {
+        return pvec[6];
+    }
+    inline double* axisP2y()
+    {
+        return pvec[7];
+    }
+
+public:
+    ConstraintMirrorPointY(Point& pA, Point& pB, Line& axis);
+    ConstraintMirrorPointY(Point& pA, Point& pB, Point& axisP1, Point& axisP2);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintMirrorPointY()
+    {}
+#endif
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// CircularInstanceX - Constraint 1: f1 = pk_x - [cx + cos(θ) * (p0_x - cx) - sin(θ) * (p0_y - cy)] = 0
+class ConstraintCircularInstanceX: public Constraint
+{
+private:
+    inline double* p0x()
+    {
+        return pvec[0];
+    }
+    inline double* p0y()
+    {
+        return pvec[1];
+    }
+    inline double* pkx()
+    {
+        return pvec[2];
+    }
+    inline double* pky()
+    {
+        return pvec[3];
+    }
+    inline double* cx()
+    {
+        return pvec[4];
+    }
+    inline double* cy()
+    {
+        return pvec[5];
+    }
+    inline double* angle()
+    {
+        return pvec[6];
+    }
+
+public:
+    ConstraintCircularInstanceX(Point& p0, Point& pk, Point& center, double* angle);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintCircularInstanceX()
+    {}
+#endif
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// CircularInstanceY - Constraint 2: f2 = pk_y - [cy + sin(θ) * (p0_x - cx) + cos(θ) * (p0_y - cy)] = 0
+class ConstraintCircularInstanceY: public Constraint
+{
+private:
+    inline double* p0x()
+    {
+        return pvec[0];
+    }
+    inline double* p0y()
+    {
+        return pvec[1];
+    }
+    inline double* pkx()
+    {
+        return pvec[2];
+    }
+    inline double* pky()
+    {
+        return pvec[3];
+    }
+    inline double* cx()
+    {
+        return pvec[4];
+    }
+    inline double* cy()
+    {
+        return pvec[5];
+    }
+    inline double* angle()
+    {
+        return pvec[6];
+    }
+
+public:
+    ConstraintCircularInstanceY(Point& p0, Point& pk, Point& center, double* angle);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintCircularInstanceY()
+    {}
+#endif
     ConstraintType getTypeId() override;
     void rescale(double coef = 1.) override;
     double error() override;
