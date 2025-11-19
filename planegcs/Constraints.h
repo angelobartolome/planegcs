@@ -88,6 +88,9 @@ enum ConstraintType
     CircularInstance = 40,
     CircularInstanceX = 41,
     CircularInstanceY = 42,
+    LinearInstance = 43,
+    LinearInstanceX = 44,
+    LinearInstanceY = 45,
 };
 
 enum InternalAlignmentType
@@ -1646,6 +1649,114 @@ public:
     ConstraintCircularInstanceY(Point& p0, Point& pk, Point& center, double* angle);
 #ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
     inline ConstraintCircularInstanceY()
+    {}
+#endif
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// LinearInstanceX - Constraint 1: f1 = pk_x - [p0_x + (base_distance * N) * (dirP2_x - dirP1_x) / ||dirP2 - dirP1||] = 0
+class ConstraintLinearInstanceX: public Constraint
+{
+private:
+    int instanceN;
+    inline double* p0x()
+    {
+        return pvec[0];
+    }
+    inline double* p0y()
+    {
+        return pvec[1];
+    }
+    inline double* pkx()
+    {
+        return pvec[2];
+    }
+    inline double* pky()
+    {
+        return pvec[3];
+    }
+    inline double* dirP1x()
+    {
+        return pvec[4];
+    }
+    inline double* dirP1y()
+    {
+        return pvec[5];
+    }
+    inline double* dirP2x()
+    {
+        return pvec[6];
+    }
+    inline double* dirP2y()
+    {
+        return pvec[7];
+    }
+    inline double* base_distance()
+    {
+        return pvec[8];
+    }
+
+public:
+    ConstraintLinearInstanceX(Point& p0, Point& pk, Point& dirP1, Point& dirP2, double* base_distance, int N);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintLinearInstanceX()
+    {}
+#endif
+    ConstraintType getTypeId() override;
+    void rescale(double coef = 1.) override;
+    double error() override;
+    double grad(double*) override;
+};
+
+// LinearInstanceY - Constraint 2: f2 = pk_y - [p0_y + (base_distance * N) * (dirP2_y - dirP1_y) / ||dirP2 - dirP1||] = 0
+class ConstraintLinearInstanceY: public Constraint
+{
+private:
+    int instanceN;
+    inline double* p0x()
+    {
+        return pvec[0];
+    }
+    inline double* p0y()
+    {
+        return pvec[1];
+    }
+    inline double* pkx()
+    {
+        return pvec[2];
+    }
+    inline double* pky()
+    {
+        return pvec[3];
+    }
+    inline double* dirP1x()
+    {
+        return pvec[4];
+    }
+    inline double* dirP1y()
+    {
+        return pvec[5];
+    }
+    inline double* dirP2x()
+    {
+        return pvec[6];
+    }
+    inline double* dirP2y()
+    {
+        return pvec[7];
+    }
+    inline double* base_distance()
+    {
+        return pvec[8];
+    }
+
+public:
+    ConstraintLinearInstanceY(Point& p0, Point& pk, Point& dirP1, Point& dirP2, double* base_distance, int N);
+#ifdef _GCS_EXTRACT_SOLVER_SUBSYSTEM_
+    inline ConstraintLinearInstanceY()
     {}
 #endif
     ConstraintType getTypeId() override;

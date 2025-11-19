@@ -358,6 +358,14 @@ public:
                                       double* angle,
                                       int tagId = 0,
                                       bool driving = true);
+    int addConstraintLinearInstance(Point& p0,
+                                    Point& pk,
+                                    Point& dirP1,
+                                    Point& dirP2,
+                                    double* base_distance,
+                                    int N,
+                                    int tagId = 0,
+                                    bool driving = true);
     int addConstraintTangentCircumf(Point& p1,
                                     Point& p2,
                                     double* rd1,
