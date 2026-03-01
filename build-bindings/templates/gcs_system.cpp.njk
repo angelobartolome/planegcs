@@ -19,6 +19,7 @@
 **************************************************************************************************/
 
 #include <iostream>
+#include <set>
 #include <vector>
 #include "GCS.h"
 #include <emscripten.h>  
@@ -137,6 +138,49 @@ class GcsSystem : System
         int dof()
         {
             return dofsNumber();
+        }
+
+        /**
+         * Returns true iff all parameters in the range [start_index, start_index + count) are
+         * dependent (determined by the constraint system). Only valid after solve(); if diagnosis
+         * is not available, returns false.
+         */
+        bool is_param_range_fully_constrained(int start_index, int count)
+        {
+            if (dofsNumber() < 0 || count <= 0)
+                return false;
+            if (start_index < 0 || start_index + count > (int)p_params.size())
+                return false;
+            VEC_pD dep;
+            getDependentParams(dep);
+            std::set<double*> dep_set(dep.begin(), dep.end());
+            for (int i = 0; i < count; ++i) {
+                if (dep_set.count(p_params[start_index + i]) == 0)
+                    return false;
+            }
+            return true;
+        }
+
+        /**
+         * Returns the number of parameters in the range [start_index, start_index + count) that
+         * are not dependent (i.e. degrees of freedom for that range). Only valid after solve();
+         * if diagnosis is not available, returns count (all free).
+         */
+        int get_param_range_dof(int start_index, int count)
+        {
+            if (dofsNumber() < 0 || count <= 0)
+                return count > 0 ? count : 0;
+            if (start_index < 0 || start_index + count > (int)p_params.size())
+                return count;
+            VEC_pD dep;
+            getDependentParams(dep);
+            std::set<double*> dep_set(dep.begin(), dep.end());
+            int free_count = 0;
+            for (int i = 0; i < count; ++i) {
+                if (dep_set.count(p_params[start_index + i]) == 0)
+                    free_count++;
+            }
+            return free_count;
         }
 
         bool has_conflicting()
@@ -403,6 +447,8 @@ EMSCRIPTEN_BINDINGS(module) {
         /* functions adapted from GCS::System */
         .function("apply_solution", &GcsSystem::apply_solution)
         .function("dof", &GcsSystem::dof)
+        .function("is_param_range_fully_constrained", &GcsSystem::is_param_range_fully_constrained)
+        .function("get_param_range_dof", &GcsSystem::get_param_range_dof)
         .function("get_conflicting", &GcsSystem::get_conflicting)
         .function("get_redundant", &GcsSystem::get_redundant)
         .function("get_partially_redundant", &GcsSystem::get_partially_redundant)

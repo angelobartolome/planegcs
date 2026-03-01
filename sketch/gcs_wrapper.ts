@@ -19,7 +19,7 @@ import type { Constraint, ConstraintParamType } from "../planegcs_dist/constrain
 import { constraint_param_index } from "../planegcs_dist/constraint_param_index.js";
 import { SketchIndex } from "./sketch_index.js";
 import { emsc_vec_to_arr } from "./emsc_vectors.js";
-import type {  SketchArc, SketchArcOfEllipse, SketchCircle, SketchEllipse, SketchLine, SketchPrimitive, SketchPoint, SketchParam, SketchHyperbola, SketchArcOfHyperbola, SketchParabola, SketchArcOfParabola } from "./sketch_primitive";
+import type { SketchArc, SketchArcOfEllipse, SketchCircle, SketchEllipse, SketchGeometry, SketchLine, SketchPrimitive, SketchPoint, SketchParam, SketchHyperbola, SketchArcOfHyperbola, SketchParabola, SketchArcOfParabola } from "./sketch_primitive";
 import { is_sketch_constraint, is_sketch_geometry } from "./sketch_primitive.js";
 import { type GcsGeometry, type GcsSystem } from "../planegcs_dist/gcs_system.js";
 import { Algorithm, Constraint_Alignment, SolveStatus, DebugMode } from "../planegcs_dist/enums.js";
@@ -184,6 +184,103 @@ export class GcsWrapper {
 
     has_gcs_partially_redundant_constraints(): boolean {
         return this.gcs.has_partially_redundant();
+    }
+
+    /**
+     * Returns the system-wide degrees of freedom (only valid after solve()).
+     * Returns -1 if diagnosis is not available.
+     */
+    get_system_dof(): number {
+        return this.gcs.dof();
+    }
+
+    /**
+     * Param ranges for a geometry primitive: list of [start_index, count] in the GCS param array.
+     * Used to check if all params of this primitive are dependent (fully constrained).
+     */
+    private get_primitive_param_ranges(primitive: SketchGeometry): [number, number][] {
+        const addr = (id: oid) => this.get_primitive_addr(id);
+        switch (primitive.type) {
+            case 'point':
+                return [[addr(primitive.id), 2]];
+            case 'line':
+                return [[addr(primitive.p1_id), 2], [addr(primitive.p2_id), 2]];
+            case 'circle':
+                return [[addr(primitive.c_id), 2], [addr(primitive.id), 1]];
+            case 'arc':
+                return [
+                    [addr(primitive.c_id), 2],
+                    [addr(primitive.start_id), 2],
+                    [addr(primitive.end_id), 2],
+                    [addr(primitive.id), 3],
+                ];
+            case 'ellipse':
+                return [[addr(primitive.c_id), 2], [addr(primitive.focus1_id), 2], [addr(primitive.id), 1]];
+            case 'arc_of_ellipse':
+                return [
+                    [addr(primitive.c_id), 2],
+                    [addr(primitive.focus1_id), 2],
+                    [addr(primitive.start_id), 2],
+                    [addr(primitive.end_id), 2],
+                    [addr(primitive.id), 3],
+                ];
+            case 'hyperbola':
+                return [[addr(primitive.c_id), 2], [addr(primitive.focus1_id), 2], [addr(primitive.id), 1]];
+            case 'arc_of_hyperbola':
+                return [
+                    [addr(primitive.c_id), 2],
+                    [addr(primitive.focus1_id), 2],
+                    [addr(primitive.start_id), 2],
+                    [addr(primitive.end_id), 2],
+                    [addr(primitive.id), 3],
+                ];
+            case 'parabola':
+                return [[addr(primitive.vertex_id), 2], [addr(primitive.focus1_id), 2]];
+            case 'arc_of_parabola':
+                return [
+                    [addr(primitive.vertex_id), 2],
+                    [addr(primitive.focus1_id), 2],
+                    [addr(primitive.start_id), 2],
+                    [addr(primitive.end_id), 2],
+                    [addr(primitive.id), 2],
+                ];
+            default:
+                throw new Error(`unknown geometry type: ${(primitive as SketchPrimitive).type}`);
+        }
+    }
+
+    /**
+     * True if all parameters of this geometry primitive are determined by the constraint system
+     * (fully constrained). Only valid after solve(); returns false if diagnosis is unavailable or
+     * the primitive is not in the sketch.
+     */
+    is_primitive_fully_constrained(primitive: SketchGeometry): boolean {
+        if (!is_sketch_geometry(primitive)) {
+            return false;
+        }
+        const ranges = this.get_primitive_param_ranges(primitive);
+        for (const [start, count] of ranges) {
+            if (!this.gcs.is_param_range_fully_constrained(start, count)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Degrees of freedom for this geometry primitive (number of free parameters).
+     * Only valid after solve(); returns the primitive's total param count if diagnosis is unavailable.
+     */
+    get_primitive_dof(primitive: SketchGeometry): number {
+        if (!is_sketch_geometry(primitive)) {
+            return 0;
+        }
+        const ranges = this.get_primitive_param_ranges(primitive);
+        let dof = 0;
+        for (const [start, count] of ranges) {
+            dof += this.gcs.get_param_range_dof(start, count);
+        }
+        return dof;
     }
 
     push_sketch_param(name: string, value: number, fixed = true): number {
